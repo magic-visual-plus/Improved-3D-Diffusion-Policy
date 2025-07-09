@@ -1,0 +1,1 @@
+while true; do nvidia-smi >> gpu_log.txt;  sleep 30; done

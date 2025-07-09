@@ -311,8 +311,10 @@ class iDP3Workspace(BaseWorkspace):
         policy = self.model
         if cfg.training.use_ema:
             policy = self.ema_model    
+    
+        device = torch.device('cuda')
+        policy.to(device)
         policy.eval()
-
         return policy
 
         

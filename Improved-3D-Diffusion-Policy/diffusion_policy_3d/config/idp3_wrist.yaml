@@ -36,8 +36,8 @@ policy:
   use_mid_condition: true
   use_up_condition: true
   use_image: false
-  use_wrist: false 
-
+  use_wrist: true 
+  
   diffusion_step_embed_dim: 128
   down_dims: [256, 512, 1024]
   
@@ -75,7 +75,7 @@ policy:
 
   pointcloud_encoder_cfg:
     in_channels: 3
-    out_channels: 128
+    out_channels: 256
     use_layernorm: true
     final_norm: layernorm # layernorm, none
     normal_channel: false

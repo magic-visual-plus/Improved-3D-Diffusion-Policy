@@ -37,11 +37,13 @@ class DiffusionPointcloudPolicy(BasePolicy):
             pointnet_type="pointnet",
             pointcloud_encoder_cfg=None,
             point_downsample=False,
+            use_wrist=False,
             # parameters passed to step
             **kwargs):
         super().__init__()
 
         self.condition_type = condition_type
+        self.use_wrist=use_wrist
 
 
         # parse shape_meta
@@ -62,6 +64,7 @@ class DiffusionPointcloudPolicy(BasePolicy):
                                                 use_pc_color=use_pc_color,
                                                 pointnet_type=pointnet_type,
                                                 point_downsample=point_downsample,
+                                                use_wrist=self.use_wrist,
                                                 )
 
         # create diffusion model
@@ -134,8 +137,12 @@ class DiffusionPointcloudPolicy(BasePolicy):
         nobs = self.normalizer.normalize(obs_dict)
         if not self.use_pc_color:
             nobs['point_cloud'] = nobs['point_cloud'][..., :3]
+            if 'wrist_point_cloud' in nobs:
+                nobs['wrist_point_cloud'] = nobs['wrist_point_cloud'][..., :3]
         if self.use_pc_color: # normalize color
             nobs['point_cloud'][..., 3:] /= 255.0
+            if 'wrist_point_cloud' in nobs:
+                nobs['wrist_point_cloud'][..., 3:] /= 255.0
         
         value = next(iter(nobs.values()))
         B, To = value.shape[:2]
@@ -178,7 +185,7 @@ class DiffusionPointcloudPolicy(BasePolicy):
         action_pred = self.normalizer['action'].unnormalize(naction_pred)
 
         # get action
-        start = To - 1
+        start = 0
         end = start + self.n_action_steps
         action = action_pred[:,start:end]
         
@@ -239,8 +246,12 @@ class DiffusionPointcloudPolicy(BasePolicy):
         nobs = self.normalizer.normalize(obs_dict)
         if not self.use_pc_color:
             nobs['point_cloud'] = nobs['point_cloud'][..., :3]
+            if 'wrist_point_cloud' in nobs:
+                nobs['wrist_point_cloud'] = nobs['wrist_point_cloud'][..., :3]
         if self.use_pc_color: # normalize color
             nobs['point_cloud'][..., 3:] /= 255.0
+            if 'wrist_point_cloud' in nobs:
+                nobs['wrist_point_cloud'][..., 3:] /= 255.0
         
         
         value = next(iter(nobs.values()))
@@ -320,8 +331,12 @@ class DiffusionPointcloudPolicy(BasePolicy):
 
         if not self.use_pc_color:
             nobs['point_cloud'] = nobs['point_cloud'][..., :3]
+            if 'wrist_point_cloud' in nobs:
+                nobs['wrist_point_cloud'] = nobs['wrist_point_cloud'][..., :3]
         if self.use_pc_color: # normalize color
             nobs['point_cloud'][..., 3:] /= 255.0
+            if 'wrist_point_cloud' in nobs:
+                nobs['wrist_point_cloud'][..., 3:] /= 255.0
 
         batch_size = nactions.shape[0]
         horizon = nactions.shape[1]

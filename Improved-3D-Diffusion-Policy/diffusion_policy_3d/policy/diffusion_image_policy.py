@@ -15,6 +15,8 @@ from diffusion_policy_3d.common.pytorch_util import dict_apply
 from termcolor import cprint
 from diffusion_policy_3d.model.vision.timm_obs_encoder import TimmObsEncoder
 import numpy as np
+from loguru import logger
+
 
 class DiffusionImagePolicy(BasePolicy):
     def __init__(self, 
@@ -32,6 +34,7 @@ class DiffusionImagePolicy(BasePolicy):
             n_groups=8,
             condition_type='film',
             use_depth=False,
+            use_wrist=False,
             use_depth_only=False,
             obs_encoder: TimmObsEncoder = None,
             # parameters passed to step
@@ -40,8 +43,10 @@ class DiffusionImagePolicy(BasePolicy):
 
         self.use_depth = use_depth
         self.use_depth_only = use_depth_only
-        cprint(f"use_depth: {use_depth}, use_depth_only: {use_depth_only}", 'red')
+        self.use_wrist = use_wrist
+        cprint(f"use_depth: {use_depth}, use_depth_only: {use_depth_only}, use_wrist: {use_wrist}", 'red')
         # parse shape_meta
+        logger.info("n_obs_steps {}", n_obs_steps)
         action_shape = shape_meta['action']['shape']
         self.action_shape = action_shape
         if len(action_shape) == 1:
@@ -52,12 +57,6 @@ class DiffusionImagePolicy(BasePolicy):
             raise NotImplementedError(f"Unsupported action shape {action_shape}")
         
         obs_shape_meta = shape_meta['obs']
-        obs_config = {
-            'low_dim': [],
-            'rgb': [],
-            'depth': [],
-            'scan': []
-        }
         
         if use_depth and not use_depth_only:
             obs_shape_meta['image']['shape'][0] = 4 # 3,H,W -> 4,H,W
@@ -116,6 +115,13 @@ class DiffusionImagePolicy(BasePolicy):
                 nobs['image'] = nobs['image'].permute(0, 1, 4, 2, 3)
             if len(nobs['image'].shape) == 4:
                 nobs['image'] = nobs['image'].permute(0, 3, 1, 2)
+        if self.use_wrist:
+            nobs['wrist_image'] /= 255.0
+            if nobs['wrist_image'].shape[-1] == 3:
+                if len(nobs['wrist_image'].shape) == 5:
+                    nobs['wrist_image'] = nobs['wrist_image'].permute(0, 1, 4, 2, 3)
+                if len(nobs['wrist_image'].shape) == 4:
+                    nobs['wrist_image'] = nobs['wrist_image'].permute(0, 3, 1, 2)
         if self.use_depth and not self.use_depth_only:
             nobs['image'] = torch.cat([nobs['image'], nobs['depth'].unsqueeze(-3)], dim=-3)
         if self.use_depth and self.use_depth_only:
@@ -227,6 +233,15 @@ class DiffusionImagePolicy(BasePolicy):
                 nobs['image'] = nobs['image'].permute(0, 1, 4, 2, 3)
             if len(nobs['image'].shape) == 4:
                 nobs['image'] = nobs['image'].permute(0, 3, 1, 2)
+                
+        if self.use_wrist:
+            nobs['wrist_image'] /= 255.0
+            if nobs['wrist_image'].shape[-1] == 3:
+                if len(nobs['wrist_image'].shape) == 5:
+                    nobs['wrist_image'] = nobs['wrist_image'].permute(0, 1, 4, 2, 3)
+                if len(nobs['wrist_image'].shape) == 4:
+                    nobs['wrist_image'] = nobs['wrist_image'].permute(0, 3, 1, 2)
+        # 
         if self.use_depth and not self.use_depth_only:
             nobs['image'] = torch.cat([nobs['image'], nobs['depth'].unsqueeze(-3)], dim=-3)
         if self.use_depth and self.use_depth_only:
@@ -278,7 +293,8 @@ class DiffusionImagePolicy(BasePolicy):
         action_pred = self.normalizer['action'].unnormalize(naction_pred)
 
         # get action
-        start = To - 1
+        # start = To - 1
+        start = 0
         end = start + self.n_action_steps
         action = action_pred[:,start:end]
         
@@ -303,6 +319,15 @@ class DiffusionImagePolicy(BasePolicy):
                 nobs['image'] = nobs['image'].permute(0, 1, 4, 2, 3)
             if len(nobs['image'].shape) == 4:
                 nobs['image'] = nobs['image'].permute(0, 3, 1, 2)
+                
+        if self.use_wrist:
+            nobs['wrist_image'] /= 255.0
+            if nobs['wrist_image'].shape[-1] == 3:
+                if len(nobs['wrist_image'].shape) == 5:
+                    nobs['wrist_image'] = nobs['wrist_image'].permute(0, 1, 4, 2, 3)
+                if len(nobs['wrist_image'].shape) == 4:
+                    nobs['wrist_image'] = nobs['wrist_image'].permute(0, 3, 1, 2)
+            
         if self.use_depth and not self.use_depth_only:
             nobs['image'] = torch.cat([nobs['image'], nobs['depth'].unsqueeze(-3)], dim=-3)
         if self.use_depth and self.use_depth_only:

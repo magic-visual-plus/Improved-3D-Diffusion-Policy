@@ -151,7 +151,7 @@ class TimmObsEncoder(ModuleAttrMixin):
                 torchvision.transforms.Resize(size=image_shape[0], antialias=True)
             ] + transforms[1:]
         transform = nn.Identity() if transforms is None else torch.nn.Sequential(*transforms)
-
+        print(f"obs transform info {transform}")
         for key, attr in obs_shape_meta.items():
             shape = tuple(attr['shape'])
             type = attr.get('type', 'low_dim')
@@ -271,6 +271,7 @@ class TimmObsEncoder(ModuleAttrMixin):
         # process rgb input
         for key in self.rgb_keys:
             img = obs_dict[key]
+            # print(f'key {key} img shape {img.shape}, key shape {self.key_shape_map[key]}')
             B, T = img.shape[:2]
             assert B == batch_size
             img = img.reshape(B*T, *img.shape[2:])

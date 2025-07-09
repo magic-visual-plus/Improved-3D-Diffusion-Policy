@@ -21,6 +21,7 @@ class GR1DexDataset3D(BaseDataset):
             max_train_episodes=None,
             task_name=None,
             num_points=4096,
+            use_wrist=False,
             ):
         super().__init__()
         cprint(f'Loading GR1DexDataset from {zarr_path}', 'green')
@@ -28,6 +29,7 @@ class GR1DexDataset3D(BaseDataset):
 
         self.num_points = num_points
 
+        print(f"use wrist {use_wrist}")
 
         buffer_keys = [
             'state', 
@@ -35,6 +37,9 @@ class GR1DexDataset3D(BaseDataset):
         
         buffer_keys.append('point_cloud')
 
+        self.use_wrist = use_wrist
+        if use_wrist:
+            buffer_keys.append('wrist_point_cloud')
 
             
         self.replay_buffer = ReplayBuffer.copy_from_path(
@@ -79,6 +84,8 @@ class GR1DexDataset3D(BaseDataset):
 
         normalizer['point_cloud'] = SingleFieldLinearNormalizer.create_identity()
         normalizer['agent_pos'] = SingleFieldLinearNormalizer.create_identity()
+        if self.use_wrist:
+            normalizer['wrist_point_cloud'] = SingleFieldLinearNormalizer.create_identity()
         
         return normalizer
 
@@ -88,14 +95,24 @@ class GR1DexDataset3D(BaseDataset):
     def _sample_to_data(self, sample):
         agent_pos = sample['state'][:,].astype(np.float32)
         point_cloud = sample['point_cloud'][:,].astype(np.float32)
+        
+        wrist_point_cloud = None
+        if self.use_wrist:
+            wrist_point_cloud = sample['wrist_point_cloud'][:,].astype(np.float32)
+            wrist_point_cloud = point_process.uniform_sampling_numpy(wrist_point_cloud, self.num_points)
+        
         point_cloud = point_process.uniform_sampling_numpy(point_cloud, self.num_points)
+        
         data = {
             'obs': {
                 'agent_pos': agent_pos,
                 'point_cloud': point_cloud,
+               
                 },
             'action': sample['action'].astype(np.float32)}
-           
+        
+        if self.use_wrist:
+             data['obs']['wrist_point_cloud'] = wrist_point_cloud
         return data
     
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:

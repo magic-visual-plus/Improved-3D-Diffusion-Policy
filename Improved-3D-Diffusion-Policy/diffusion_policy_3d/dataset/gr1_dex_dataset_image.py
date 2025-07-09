@@ -9,7 +9,7 @@ from diffusion_policy_3d.model.common.normalizer import LinearNormalizer, Single
 from diffusion_policy_3d.dataset.base_dataset import BaseDataset
 import diffusion_policy_3d.model.vision_3d.point_process as point_process
 from termcolor import cprint
-from scipy.ndimage import zoom
+# from scipy.ndimage import zoom
 
 class GR1DexDatasetImage(BaseDataset):
     def __init__(self,
@@ -22,6 +22,7 @@ class GR1DexDatasetImage(BaseDataset):
             max_train_episodes=None,
             task_name=None,
             use_img=True,
+            use_wrist=False,
             use_depth=False,
             ):
         super().__init__()
@@ -29,17 +30,22 @@ class GR1DexDatasetImage(BaseDataset):
         self.task_name = task_name
         self.use_img = use_img
         self.use_depth = use_depth
+        self.use_wrist = use_wrist
 
-
+        print(f"use wrist {use_wrist}")
+        
         buffer_keys = [
             'state', 
             'action',]
         
         if self.use_img:
-            buffer_keys.append('img')
+            buffer_keys.append('image')
+        if self.use_wrist:
+            buffer_keys.append('wrist_image')
         if self.use_depth:
             buffer_keys.append('depth')
 
+        print(f"buffer keys {buffer_keys}")
         self.replay_buffer = ReplayBuffer.copy_from_path(
             zarr_path, keys=buffer_keys)
         
@@ -81,6 +87,8 @@ class GR1DexDatasetImage(BaseDataset):
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
         if self.use_img:
             normalizer['image'] = SingleFieldLinearNormalizer.create_identity()
+        if self.use_wrist:
+            normalizer['wrist_image'] = SingleFieldLinearNormalizer.create_identity()
         if self.use_depth:
             normalizer['depth'] = SingleFieldLinearNormalizer.create_identity()
         
@@ -95,7 +103,9 @@ class GR1DexDatasetImage(BaseDataset):
         agent_pos = sample['state'][:,].astype(np.float32)
        
         if self.use_img:
-            image = sample['img'][:,].astype(np.float32)
+            image = sample['image'][:,].astype(np.float32)
+        if self.use_wrist:
+            wrist_image = sample['wrist_image'][:,].astype(np.float32)
         if self.use_depth:
             depth = sample['depth'][:,].astype(np.float32)
             
@@ -106,9 +116,12 @@ class GR1DexDatasetImage(BaseDataset):
             'action': sample['action'].astype(np.float32)}
         if self.use_img:
             data['obs']['image'] = image
+        if self.use_wrist:
+            data['obs']['wrist_image'] = wrist_image
         if self.use_depth:
             data['obs']['depth'] = depth
-            
+        
+        # print(f'data keys {data["obs"].keys()}')
         return data
     
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:

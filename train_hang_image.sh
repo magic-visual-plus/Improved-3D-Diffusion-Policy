@@ -1,0 +1,1 @@
+bash scripts/train_policy_image.sh dp_224x224_r3m gr1_dex-image 0527_pick_image_1

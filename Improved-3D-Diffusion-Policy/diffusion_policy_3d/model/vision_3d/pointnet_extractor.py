@@ -82,15 +82,20 @@ class StateEncoder(nn.Module):
 class iDP3Encoder(nn.Module):
     def __init__(self, 
                  observation_space: Dict, 
-                 state_mlp_size=(64, 64), state_mlp_activation_fn=nn.ReLU,
+                 state_mlp_size=(64, 64), 
+                 state_mlp_activation_fn=nn.ReLU,
                  pointcloud_encoder_cfg=None,
                  use_pc_color=False,
                  pointnet_type='dp3_encoder',
                  point_downsample=True,
+                 use_wrist=False,
                  ):
         super().__init__()
+        self.use_wrist=use_wrist
         self.state_key = 'agent_pos'
         self.point_cloud_key = 'point_cloud'
+        self.wrist_point_cloud_key = 'wrist_point_cloud'
+        # total output channel = point cloud + state
         self.n_output_channels = pointcloud_encoder_cfg.out_channels
         
         self.point_cloud_shape = observation_space[self.point_cloud_key]
@@ -117,7 +122,11 @@ class iDP3Encoder(nn.Module):
         
         if pointnet_type == "multi_stage_pointnet":
             from .multi_stage_pointnet import MultiStagePointNetEncoder
-            self.extractor = MultiStagePointNetEncoder(out_channels=pointcloud_encoder_cfg.out_channels)
+            extractor_channel_size = pointcloud_encoder_cfg.out_channels
+            if self.use_wrist:
+                extractor_channel_size = extractor_channel_size // 2
+                self.wrist_extractor = MultiStagePointNetEncoder(out_channels=extractor_channel_size)
+            self.extractor = MultiStagePointNetEncoder(out_channels=extractor_channel_size)
         else:
             raise NotImplementedError(f"pointnet_type: {pointnet_type}")
 
@@ -128,6 +137,7 @@ class iDP3Encoder(nn.Module):
             net_arch = []
         else:
             net_arch = state_mlp_size[:-1]
+        # state output dim
         output_dim = state_mlp_size[-1]
 
         self.n_output_channels  += output_dim
@@ -140,16 +150,29 @@ class iDP3Encoder(nn.Module):
         points = observations[self.point_cloud_key]
         assert len(points.shape) == 3, cprint(f"point cloud shape: {points.shape}, length should be 3", "red")
 
+        wrist_points = None
+        if self.use_wrist:
+            wrist_points = observations[self.wrist_point_cloud_key]
+            if self.downsample:
+                wrist_points = self.point_preprocess(wrist_points, self.num_points)
         # points = torch.transpose(points, 1, 2)   # B * 3 * N
         # points: B * 3 * (N + sum(Ni))
         if self.downsample:
             points = self.point_preprocess(points, self.num_points)
            
         pn_feat = self.extractor(points)    # B * out_channel
-         
+        if self.use_wrist:
+            wrist_pn_feat = self.wrist_extractor(wrist_points)
+        
         state = observations[self.state_key]
+        # print(f'state shape {state.shape}')
+        # print(f'state mlp {self.state_mlp}')
         state_feat = self.state_mlp(state)  # B * 64
-        final_feat = torch.cat([pn_feat, state_feat], dim=-1)
+        if self.use_wrist:
+            final_feat = torch.cat([pn_feat, wrist_pn_feat, state_feat], dim=-1)
+            # print(f'final feat shape {final_feat.shape}')
+        else:
+            final_feat = torch.cat([pn_feat, state_feat], dim=-1)
         return final_feat
 
 

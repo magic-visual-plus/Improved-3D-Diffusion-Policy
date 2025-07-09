@@ -395,6 +395,9 @@ class DPWorkspace(BaseWorkspace):
         policy = self.model
         if cfg.training.use_ema:
             policy = self.ema_model    
+        # policy.eval()
+        device = torch.device('cuda')
+        policy.to(device)
         policy.eval()
 
         return policy
